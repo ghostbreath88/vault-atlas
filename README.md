@@ -65,7 +65,7 @@ The demo vault (**Try the demo vault**) is synthetic, clearly labelled, and stor
 
 ## Tested
 
-Automated tests run in CI on every push: unit tests (parser, resolver, inventory, graph edges, snapshot diff and move detection, dangling references, DB migration v1→v2) plus typecheck. `tests/e2e/acceptance.mjs` is a Playwright end-to-end run against a deployed URL.
+Automated tests run in CI on every push: unit tests (parser, resolver, inventory, graph edges, snapshot diff and move detection, dangling references, DB migration v1→v2) plus typecheck. `tests/e2e/acceptance.mjs` is a Playwright end-to-end run (25 checks) that passed against the production GitHub Pages URL.
 
 | Area | How tested | Result |
 | --- | --- | --- |
@@ -83,6 +83,7 @@ Automated tests run in CI on every push: unit tests (parser, resolver, inventory
 | Cancel a running import: nothing saved | Playwright, 5,000-note vault | Pass |
 | Offline reload after first visit (service worker) | Playwright, offline mode | Pass |
 | Network audit: only same-origin GET requests for app files; no vault text or names in any request | Playwright request log | Pass |
+| Real app update on GitHub Pages (1.0.0 → 1.0.1): “Update ready” shown, imported notes and pins kept | Playwright, persistent browser profile against production | Pass |
 | DB migration v1 → v2 keeps notes, pins, boards, views, settings | Vitest + fake-indexeddb | Pass |
 | Large vaults: 1,000 notes (≈1.4 s parse, 0.5 s save) and 5,000 notes (≈6.5 s parse, 3.1 s save, graph capped at 4,000 most-connected nodes with a notice) | Playwright, desktop Chromium in a cloud sandbox | Pass (desktop only) |
 | Light and dark themes, reduced motion, phone layout without horizontal scrolling | Playwright screenshots | Pass |

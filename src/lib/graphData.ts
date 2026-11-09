@@ -8,9 +8,9 @@ export const DEFAULT_FILTERS: GraphFilters = {
   colorBy: 'folder', sizeByDegree: true, arrows: false, labels: 'adaptive',
 };
 
-// Muted, distinguishable hues that read on both themes.
-export const PALETTE = ['#f2a0ae', '#f2c08a', '#9fd39a', '#8fabf5', '#d873e6', '#e6d27a', '#7fd6cf', '#c79af5', '#ff8f6b', '#b8a6c0'];
-export const COLORS = { tag: '#e8c95a', attachment: '#e3b98a', unresolved: '#ff6f8e', linkEdge: 'rgba(214,160,220,0.55)', tagEdge: 'rgba(232,201,90,0.5)', attEdge: 'rgba(227,185,138,0.45)', unresEdge: 'rgba(255,111,142,0.45)', neutral: '#b8a6c0' };
+// Neon rainbow, kept distinguishable; tags/attachments/unresolved use separate shapes-of-colour below.
+export const PALETTE = ['#ff4fd8', '#35e8ff', '#8cff66', '#ffa04d', '#b195ff', '#48ffc8', '#6f9bff', '#ff6f9f', '#d4ff4a', '#f7a8ff'];
+export const COLORS = { tag: '#ffe45c', attachment: '#c8b7a6', unresolved: '#ff3355', linkEdge: 'rgba(201,251,227,0.45)', tagEdge: 'rgba(255,228,92,0.5)', attEdge: 'rgba(200,183,166,0.45)', unresEdge: 'rgba(255,51,85,0.5)', neutral: '#9ad9bd' };
 
 export type NodeKind = 'note' | 'tag' | 'attachment' | 'unresolved';
 export type EdgeKind = 'link' | 'tag' | 'tag-parent' | 'attachment' | 'unresolved';

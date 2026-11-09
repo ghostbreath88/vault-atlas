@@ -1,6 +1,6 @@
 {
   "name": "vault-atlas",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -11,9 +11,9 @@
   "license": "MIT",
   "description": "Private, local-first dashboard and graph explorer for Obsidian vaults",
   "dependencies": {
-    "@fontsource-variable/figtree": "^5.3.0",
-    "@fontsource-variable/jetbrains-mono": "^5.3.0",
-    "@fontsource-variable/source-serif-4": "^5.3.1",
+    "@capacitor/android": "^8.6.0",
+    "@capacitor/core": "^8.6.0",
+    "@fontsource-variable/source-code-pro": "^5.3.1",
     "@sigma/edge-curve": "^3.1.0",
     "@sigma/node-border": "^3.0.0",
     "dompurify": "^3.4.17",
@@ -31,6 +31,7 @@
     "sigma": "^3.0.2"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.6.0",
     "@types/js-yaml": "^4.0.9",
     "@types/markdown-it": "^14.2.0",
     "@types/node": "^20.19.43",
@@ -38,6 +39,7 @@
     "@types/react-dom": "^18.3.7",
     "@vitejs/plugin-react": "^4.7.0",
     "fake-indexeddb": "^6.2.7",
+    "playwright": "^1.59.0",
     "typescript": "^7.0.2",
     "vite": "^5.4.21",
     "vite-plugin-pwa": "^2.0.0",

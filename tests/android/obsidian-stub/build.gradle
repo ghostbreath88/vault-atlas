@@ -1,0 +1,13 @@
+// Test-only stand-in for the Obsidian app: receives obsidian:// links so CI can verify the exact URI Vault Atlas sends.
+apply plugin: 'com.android.application'
+android {
+    namespace = "io.github.ghostbreath88.obsidianstub"
+    compileSdk = rootProject.ext.compileSdkVersion
+    defaultConfig {
+        applicationId "io.github.ghostbreath88.obsidianstub"
+        minSdkVersion rootProject.ext.minSdkVersion
+        targetSdkVersion rootProject.ext.targetSdkVersion
+        versionCode 1
+        versionName "1.0"
+    }
+}

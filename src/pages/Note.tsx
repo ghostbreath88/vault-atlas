@@ -1,3 +1,4 @@
+import { isNative } from '../native';
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { Pin, PinOff, Code2, BookOpen, Network, LayoutDashboard, ImageOff, Image as ImageIcon, ExternalLink, AlertTriangle, Link2, CornerDownLeft, Hash, Paperclip, Info } from 'lucide-react';
 import { useStore, toggleFavorite, recordOpen } from '../store';
@@ -87,7 +88,8 @@ export default function NotePage({ path, query }: { path: string; query: URLSear
     return { p, name: src?.name ?? p, line, n: ls.length };
   });
   const obsidianVault = app?.obsidianVaultName || vault.rootName || vault.name;
-  const obsidianUri = `obsidian://open?vault=${encodeURIComponent(obsidianVault)}&file=${encodeURIComponent(note.path.replace(/\.md$/, ''))}`;
+  // Full vault-relative path including the extension, so Obsidian opens exactly this file even if other notes share its name.
+  const obsidianUri = `obsidian://open?vault=${encodeURIComponent(obsidianVault)}&file=${encodeURIComponent(note.path)}`;
 
   return (
     <div className="reader-wrap">
@@ -104,13 +106,15 @@ export default function NotePage({ path, query }: { path: string; query: URLSear
             <button className={'btn sm' + (raw ? ' on' : '')} aria-pressed={raw} onClick={() => setRaw(!raw)} data-testid="button-raw">{raw ? <BookOpen /> : <Code2 />}{raw ? 'Reading view' : 'View original Markdown'}</button>
             <a className="btn sm" href={`#/graph?center=${encodeURIComponent(path)}`} data-testid="button-open-graph"><Network />Graph</a>
             <button className="btn sm" onClick={() => setAddOpen(true)} data-testid="button-add-board"><LayoutDashboard />Add to board</button>
-            <a className="btn sm ghost" href={obsidianUri} title={`Opens “${obsidianVault}” in the Obsidian app if it's installed (vault name can be changed in Settings)`}><ExternalLink />Open in Obsidian</a>
+            <a className="btn sm ghost" href={obsidianUri} data-testid="button-open-obsidian" data-uri={obsidianUri} title={`Opens “${obsidianVault}” in the Obsidian app if it's installed (vault name can be changed in Settings)`}><ExternalLink />Open in Obsidian</a>
           </div>
           {blocked > 0 && !raw && (
             <div className="notice" style={{ marginTop: 12 }}>
               <ImageOff aria-hidden />
-              <div className="grow"><strong>{plural(blocked, 'remote image')} not loaded.</strong> Loading contacts the image's server, which can reveal your IP address to it. Nothing from your vault is sent.</div>
-              {settings.remoteImages === 'ask' && <button className="btn sm" onClick={() => setAllowRemote(true)} data-testid="button-load-remote"><ImageIcon />Load for this note</button>}
+              {isNative
+                ? <div className="grow"><strong>{plural(blocked, 'remote image')} not shown.</strong> The Android app has no internet access, so images hosted on websites can't load. Images stored in your vault display normally.</div>
+                : <div className="grow"><strong>{plural(blocked, 'remote image')} not loaded.</strong> Loading contacts the image's server, which can reveal your IP address to it. Nothing from your vault is sent.</div>}
+              {!isNative && settings.remoteImages === 'ask' && <button className="btn sm" onClick={() => setAllowRemote(true)} data-testid="button-load-remote"><ImageIcon />Load for this note</button>}
             </div>
           )}
         </header>

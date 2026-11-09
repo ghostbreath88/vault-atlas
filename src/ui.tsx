@@ -1,3 +1,4 @@
+import { saveUserFile } from './native';
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { FileText, FileWarning } from 'lucide-react';
 import { encodeRoutePath } from './lib/paths';
@@ -166,13 +167,8 @@ export function Confirm({ title, body, confirmLabel, danger, requireText, onConf
   );
 }
 
-export function downloadText(filename: string, text: string, type = 'application/json') {
-  const blob = new Blob([text], { type });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url; a.download = filename; a.rel = 'noopener';
-  document.body.append(a); a.click(); a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 4000);
+export function downloadText(filename: string, text: string, type = 'application/json'): Promise<boolean> {
+  return saveUserFile(filename, type, text);
 }
 
 export function useMediaQuery(q: string) {

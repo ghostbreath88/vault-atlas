@@ -1,0 +1,120 @@
+name: Android APK (build, emulator tests, signed release)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      HAS_KEY: ${{ secrets.ATLAS_KEYSTORE_BASE64 != '' }}
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      code: ${{ steps.v.outputs.code }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 21, cache: gradle }
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - name: Build the web app into the APK assets (relative paths, no service worker in the APK)
+        run: npm run build && npx cap sync android
+      - id: v
+        run: |
+          echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+          echo "code=$((1000 + GITHUB_RUN_NUMBER * 2))" >> "$GITHUB_OUTPUT"
+      - name: Test APKs (debug-signed, WebView debugging on) — an older and a newer versionCode for the update test
+        working-directory: android
+        env:
+          CODE: ${{ steps.v.outputs.code }}
+        run: |
+          mkdir -p ../apk
+          ATLAS_VERSION_CODE=$((CODE - 1)) ./gradlew --no-daemon -q assembleDebug
+          cp app/build/outputs/apk/debug/app-debug.apk ../apk/test-old.apk
+          ATLAS_VERSION_CODE=$CODE ./gradlew --no-daemon -q assembleDebug :obsidianstub:assembleDebug
+          cp app/build/outputs/apk/debug/app-debug.apk ../apk/test-new.apk
+          cp ../tests/android/obsidian-stub/build/outputs/apk/debug/obsidianstub-debug.apk ../apk/obsidian-stub.apk
+      - name: Signed release APK
+        if: ${{ env.HAS_KEY == 'true' }}
+        working-directory: android
+        env:
+          ATLAS_KEYSTORE_BASE64: ${{ secrets.ATLAS_KEYSTORE_BASE64 }}
+          ATLAS_KEYSTORE_PASSWORD: ${{ secrets.ATLAS_KEYSTORE_PASSWORD }}
+          ATLAS_KEY_ALIAS: ${{ secrets.ATLAS_KEY_ALIAS }}
+          ATLAS_KEY_PASSWORD: ${{ secrets.ATLAS_KEY_PASSWORD }}
+          ATLAS_VERSION_CODE: ${{ steps.v.outputs.code }}
+        run: |
+          export ATLAS_KEYSTORE_FILE="$RUNNER_TEMP/release.jks"
+          echo "$ATLAS_KEYSTORE_BASE64" | base64 -d > "$ATLAS_KEYSTORE_FILE"
+          ./gradlew --no-daemon -q assembleRelease
+          rm -f "$ATLAS_KEYSTORE_FILE"
+          BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          "$BT/apksigner" verify --print-certs app/build/outputs/apk/release/app-release.apk | grep -E "Signer #1 certificate (DN|SHA-256)"
+          "$BT/aapt2" dump permissions app/build/outputs/apk/release/app-release.apk
+          if "$BT/aapt2" dump permissions app/build/outputs/apk/release/app-release.apk | grep -q "android.permission.INTERNET"; then echo "INTERNET permission found!"; exit 1; fi
+          cp app/build/outputs/apk/release/app-release.apk ../apk/vault-atlas.apk
+        shell: bash
+      - uses: actions/upload-artifact@v4
+        with: { name: apks, path: apk/, retention-days: 30 }
+
+  android-test:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - uses: actions/download-artifact@v4
+        with: { name: apks, path: apk }
+      - name: Enable KVM for the emulator
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules && sudo udevadm trigger --name-match=kvm
+      - name: Run Android acceptance tests on an emulator (Android 14)
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -no-snapshot
+          script: OLD_APK=apk/test-old.apk NEW_APK=apk/test-new.apk STUB_APK=apk/obsidian-stub.apk RELEASE_APK=$( [ -f apk/vault-atlas.apk ] && echo apk/vault-atlas.apk ) OUT_DIR=android-test-results node tests/android/run.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: android-test-results, path: android-test-results/ }
+
+  release:
+    needs: [build, android-test]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: { name: apks, path: apk }
+      - name: Publish the tested, signed APK as a GitHub Release
+        if: ${{ hashFiles('apk/vault-atlas.apk') != '' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          V: ${{ needs.build.outputs.version }}
+          CODE: ${{ needs.build.outputs.code }}
+        run: |
+          cp apk/vault-atlas.apk "apk/vault-atlas-$V.apk"
+          gh release delete "v$V" --cleanup-tag -y || true
+          gh release create "v$V" --target "$GITHUB_SHA" --latest --title "Vault Atlas $V for Android (build $CODE)" \
+            --notes "Signed, offline Android APK built and tested by GitHub Actions from commit $GITHUB_SHA. Install: download vault-atlas.apk on your phone and open it. Updates install over the previous version and keep your data." \
+            apk/vault-atlas.apk "apk/vault-atlas-$V.apk"

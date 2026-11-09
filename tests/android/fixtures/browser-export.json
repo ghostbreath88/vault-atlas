@@ -1,0 +1,110 @@
+{
+  "format": "vault-atlas-appdata",
+  "version": 1,
+  "exportedAt": "2026-11-09T20:57:54.183Z",
+  "note": "Vault Atlas app-only data: settings, pinned notes, reading history, dashboard layout, saved graph views and boards. This is NOT a backup of your Obsidian notes; it contains note paths but no note content.",
+  "settings": {
+    "theme": "system",
+    "remoteImages": "ask",
+    "aliasFallback": false,
+    "maxAttachmentMB": 40,
+    "graphNodeLimit": 4000,
+    "persistDefault": true,
+    "currentVaultId": "a211c97d-0063-40e6-b1f8-e9745fd557d5"
+  },
+  "vaults": [
+    {
+      "id": "a211c97d-0063-40e6-b1f8-e9745fd557d5",
+      "name": "Atlas Demo Vault",
+      "rootName": "Atlas Demo Vault",
+      "isDemo": false,
+      "app": {
+        "vaultId": "a211c97d-0063-40e6-b1f8-e9745fd557d5",
+        "favorites": [
+          "Recipes/Bread.md"
+        ],
+        "recents": [
+          {
+            "path": "Recipes/Bread.md",
+            "at": 1794257872056
+          }
+        ],
+        "dashboard": {
+          "order": [
+            "search",
+            "stats",
+            "continue",
+            "pinned",
+            "recent",
+            "folders",
+            "tags"
+          ],
+          "hidden": []
+        },
+        "moves": []
+      },
+      "boards": [
+        {
+          "id": "cf5e5817-750a-461e-acf7-d0871087e993",
+          "vaultId": "a211c97d-0063-40e6-b1f8-e9745fd557d5",
+          "name": "Browser board",
+          "cards": [
+            {
+              "id": "b5c5b1e7-3a2c-4e6a-a881-2d8de4b6f3b2",
+              "notePath": "Recipes/Bread.md",
+              "title": "Bread",
+              "x": 40,
+              "y": 20
+            }
+          ],
+          "links": [],
+          "camera": {
+            "x": 80,
+            "y": 80,
+            "zoom": 1
+          },
+          "createdAt": 1794257872243,
+          "updatedAt": 1794257872243
+        }
+      ],
+      "views": [
+        {
+          "id": "736538c7-c9a6-4bb8-8a65-480912bcf4c6",
+          "vaultId": "a211c97d-0063-40e6-b1f8-e9745fd557d5",
+          "name": "Browser view",
+          "mode": "local",
+          "center": "Recipes/Bread.md",
+          "depth": 1,
+          "filters": {
+            "folders": [],
+            "tags": [],
+            "tagMode": "or",
+            "showTags": false,
+            "showAttachments": false,
+            "showUnresolved": false,
+            "showOrphans": true,
+            "colorBy": "folder",
+            "sizeByDegree": true,
+            "arrows": false,
+            "labels": "adaptive"
+          },
+          "positions": {
+            "note:Recipes/Bread.md": [
+              -13.20845890045166,
+              5.714441776275635
+            ],
+            "note:Welcome.md": [
+              10.646185874938965,
+              9.41350269317627
+            ],
+            "note:Ideas/Garden.md": [
+              -0.7284520268440247,
+              -13.694123268127441
+            ]
+          },
+          "createdAt": 1794257873663
+        }
+      ]
+    }
+  ]
+}

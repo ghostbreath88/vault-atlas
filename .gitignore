@@ -3,3 +3,9 @@ dist
 *.log
 .DS_Store
 test-results
+
+# Signing material must never be committed
+*.jks
+*.keystore
+*.p12
+signing-backup/

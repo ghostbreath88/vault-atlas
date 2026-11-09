@@ -1,6 +1,8 @@
 import { ExternalLink, Download } from 'lucide-react';
 import { useStore, attachmentUrl } from '../store';
 import { Empty, fmtBytes, fmtDate, noteRoute } from '../ui';
+import { isNative, openAttachmentNative, saveUserFile } from '../native';
+import { toast } from '../store';
 
 export default function FilePage({ path }: { path: string }) {
   const { attachments, index, notes } = useStore((s) => s);
@@ -16,8 +18,13 @@ export default function FilePage({ path }: { path: string }) {
       {a.media === 'video' && <video controls src={url} style={{ width: '100%', borderRadius: 12 }} />}
       {a.media === 'pdf' && <div className="notice"><ExternalLink aria-hidden /><div>PDFs aren't rendered inside Vault Atlas. Opening it hands this local copy to your browser's or phone's PDF viewer — it isn't uploaded anywhere.</div></div>}
       <div className="row-wrap" style={{ margin: '16px 0 24px' }}>
-        <a className="btn" href={url} target="_blank" rel="noopener noreferrer"><ExternalLink />Open</a>
-        <a className="btn ghost" href={url} download={a.name}><Download />Save a copy</a>
+        {isNative ? <>
+          <button className="btn" onClick={() => openAttachmentNative(a.name, a.mime, a.blob).then((e) => e && toast(e, 'warn')).catch((e) => toast(String(e.message || e), 'error'))}><ExternalLink />Open in another app</button>
+          <button className="btn ghost" onClick={async () => { if (await saveUserFile(a.name, a.mime, new Uint8Array(await a.blob.arrayBuffer()))) toast('Copy saved'); }}><Download />Save a copy</button>
+        </> : <>
+          <a className="btn" href={url} target="_blank" rel="noopener noreferrer"><ExternalLink />Open</a>
+          <a className="btn ghost" href={url} download={a.name}><Download />Save a copy</a>
+        </>}
       </div>
       <h2 className="section-title">Referenced by</h2>
       <div className="link-list">{refs.map((p) => <a key={p} href={noteRoute(p)}>{notes.get(p)?.name ?? p}</a>)}{!refs.length && <div className="empty-sm">No notes reference this file.</div>}</div>

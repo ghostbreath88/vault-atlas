@@ -15,18 +15,7 @@ import FilePage from './pages/File';
 import { dangling } from './store';
 
 function useTheme() {
-  const theme = useStore((s) => s.settings.theme);
-  useEffect(() => {
-    const apply = () => {
-      const t = theme === 'system' ? (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark') : theme;
-      document.documentElement.dataset.theme = t;
-      document.querySelector('meta[name="theme-color"]')?.setAttribute('content', t === 'light' ? '#f6eef5' : '#0b000e');
-    };
-    apply();
-    const m = matchMedia('(prefers-color-scheme: light)');
-    m.addEventListener('change', apply);
-    return () => m.removeEventListener('change', apply);
-  }, [theme]);
+  useEffect(() => { document.documentElement.dataset.theme = 'dark'; }, []);
 }
 
 function useOnline() {

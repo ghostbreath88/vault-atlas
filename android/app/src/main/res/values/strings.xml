@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Vault Atlas</string>
+    <string name="title_activity_main">Vault Atlas</string>
+    <string name="package_name">io.github.ghostbreath88.vaultatlas</string>
+    <string name="custom_url_scheme">io.github.ghostbreath88.vaultatlas</string>
+</resources>

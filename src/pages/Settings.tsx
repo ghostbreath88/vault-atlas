@@ -1,3 +1,4 @@
+import { isNative } from '../native';
 import { useEffect, useRef, useState } from 'react';
 import { Download, Upload, Trash2, HardDrive, ShieldCheck, Smartphone, Palette } from 'lucide-react';
 import { useStore, saveSettings, exportAppData, importAppData, deleteAllLocalData, deleteVault, setPersistContent, setObsidianVaultName, toast, setState, type AppDataExport } from '../store';
@@ -23,8 +24,7 @@ export default function SettingsPage() {
 
   const doExport = async () => {
     const data = await exportAppData();
-    downloadText(`vault-atlas-settings-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(data, null, 2));
-    toast('Settings, pins, views and boards exported');
+    if (await downloadText(`vault-atlas-settings-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(data, null, 2))) toast('Settings, pins, views and boards exported');
   };
   const onFile = async (f?: File) => {
     if (!f) return;
@@ -46,15 +46,10 @@ export default function SettingsPage() {
 
   return (
     <div className="page narrow">
-      <div className="page-head"><div><h1 className="page-title">Settings &amp; data</h1><p className="page-sub">Everything is stored only in this browser on this device.</p></div></div>
+      <div className="page-head"><div><h1 className="page-title">Settings &amp; data</h1><p className="page-sub">{isNative ? 'Everything is stored only inside this app on this device. The app has no internet access.' : 'Everything is stored only in this browser on this device.'}</p></div></div>
       <div className="stack" style={{ gap: 20 }}>
         <section className="card stack">
           <div className="row"><Palette size={18} color="var(--accent)" /><strong>Appearance &amp; reading</strong></div>
-          <label className="field">Theme
-            <select className="input" value={settings.theme} onChange={(e) => saveSettings({ theme: e.target.value as any })} data-testid="select-theme">
-              <option value="system">Match system</option><option value="dark">Dark</option><option value="light">Light (warm)</option>
-            </select>
-          </label>
           <label className="field">Remote images in notes
             <select className="input" value={settings.remoteImages} onChange={(e) => saveSettings({ remoteImages: e.target.value as any })}>
               <option value="ask">Blocked, with a per-note “Load” button</option><option value="off">Always blocked</option>
@@ -67,8 +62,8 @@ export default function SettingsPage() {
         <section className="card stack">
           <div className="row"><HardDrive size={18} color="var(--accent)" /><strong>Storage on this device</strong></div>
           <div className="small muted">Using {fmtBytes(est.usage)} of about {fmtBytes(est.quota)} available to this site. Persistent storage: <strong>{est.persisted ? 'granted' : persistence === 'unsupported' ? 'not supported' : 'not granted'}</strong>.</div>
-          {!est.persisted && <div><button className="btn sm" onClick={async () => { const p = await requestPersistence(); setState({ persistence: p }); toast(p === 'granted' ? 'Persistent storage granted' : 'The browser declined persistent storage (often granted after installing the app or using it more)', p === 'granted' ? 'ok' : 'warn'); storageEstimate().then(setEst); }}>Ask for persistent storage</button></div>}
-          <div className="notice warn small"><ShieldCheck aria-hidden /><div><strong>This is not a backup.</strong> Browser data can be erased by clearing site data, uninstalling the browser, or low storage. Your Obsidian vault remains the source of truth — keep it backed up separately.</div></div>
+          {!isNative && !est.persisted && <div><button className="btn sm" onClick={async () => { const p = await requestPersistence(); setState({ persistence: p }); toast(p === 'granted' ? 'Persistent storage granted' : 'The browser declined persistent storage (often granted after installing the app or using it more)', p === 'granted' ? 'ok' : 'warn'); storageEstimate().then(setEst); }}>Ask for persistent storage</button></div>}
+          <div className="notice warn small"><ShieldCheck aria-hidden /><div><strong>This is not a backup.</strong> {isNative ? 'App data is erased if you uninstall Vault Atlas or clear its storage in Android settings. Updating the app keeps it.' : 'Browser data can be erased by clearing site data, uninstalling the browser, or low storage.'} Your Obsidian vault remains the source of truth — keep it backed up separately.</div></div>
           {vault && (
             <label className="check"><input type="checkbox" checked={vault.persistContent} onChange={(e) => setPersistContent(e.target.checked).then(() => toast(e.target.checked ? 'Note content will be kept on this device' : 'Stored note content removed; it stays in memory until you close the app'))} data-testid="check-persist-vault" />Keep note content of “{vault.name}” on this device</label>
           )}
@@ -88,14 +83,14 @@ export default function SettingsPage() {
 
         <section className="card stack">
           <div className="row"><Smartphone size={18} color="var(--accent)" /><strong>Install &amp; offline</strong></div>
-          <div className="small muted">{standalone ? 'Running as an installed app.' : 'Install Vault Atlas to open it like an app, offline. In Chrome: ⋮ menu → “Add to Home screen” / “Install app”.'} After the first load, the app works offline; your imported vault is read from this device.</div>
-          {canInstall && !standalone && <div><button className="btn" onClick={async () => { deferredInstall?.prompt(); deferredInstall = null; setCanInstall(false); }}>Install app</button></div>}
+          {isNative ? <div className="small muted">Android app: everything it needs is inside the APK, so it works offline from the first launch. To move settings from the browser version: export app data there, then use <strong>Import app data</strong> here.</div> : <div className="small muted">{standalone ? 'Running as an installed app.' : 'Install Vault Atlas to open it like an app, offline. In Chrome: ⋮ menu → “Add to Home screen” / “Install app”.'} After the first load, the app works offline; your imported vault is read from this device.</div>}
+          {!isNative && canInstall && !standalone && <div><button className="btn" onClick={async () => { deferredInstall?.prompt(); deferredInstall = null; setCanInstall(false); }}>Install app</button></div>}
           <div className="xs faint">Version {__APP_VERSION__}</div>
         </section>
 
         <section className="card stack" style={{ borderColor: 'color-mix(in srgb, var(--danger) 30%, transparent)' }}>
           <div className="row"><Trash2 size={18} color="var(--danger)" /><strong>Delete data</strong></div>
-          <div className="small muted">Deleting only affects Vault Atlas in this browser. Your Obsidian files are never touched.</div>
+          <div className="small muted">Deleting only affects Vault Atlas's own copy on this device. Your Obsidian files are never touched.</div>
           <div className="row-wrap">
             {vault && <button className="btn danger" onClick={() => setConfirmVault(true)} data-testid="button-delete-vault">Delete “{vault.isDemo ? 'Demo vault' : vault.name}” from this device</button>}
             <button className="btn danger" onClick={() => setConfirmAll(true)} data-testid="button-delete-all">Delete all imported local data</button>

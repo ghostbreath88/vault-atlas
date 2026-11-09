@@ -20,7 +20,7 @@ function useTheme() {
     const apply = () => {
       const t = theme === 'system' ? (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark') : theme;
       document.documentElement.dataset.theme = t;
-      document.querySelector('meta[name="theme-color"]')?.setAttribute('content', t === 'light' ? '#f4efe6' : '#121418');
+      document.querySelector('meta[name="theme-color"]')?.setAttribute('content', t === 'light' ? '#f6eef5' : '#0b000e');
     };
     apply();
     const m = matchMedia('(prefers-color-scheme: light)');

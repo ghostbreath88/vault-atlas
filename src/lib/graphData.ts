@@ -9,8 +9,8 @@ export const DEFAULT_FILTERS: GraphFilters = {
 };
 
 // Muted, distinguishable hues that read on both themes.
-export const PALETTE = ['#d9a35b', '#5fa8b0', '#8fbf8f', '#e0907e', '#c7b46a', '#6fa0d8', '#d48fb5', '#9aa77a', '#c49a7a', '#8a96a3'];
-export const COLORS = { tag: '#9b7fe0', attachment: '#c9a86a', unresolved: '#d77b6e', linkEdge: 'rgba(150,160,170,0.55)', tagEdge: 'rgba(140,110,215,0.55)', attEdge: 'rgba(201,168,106,0.45)', unresEdge: 'rgba(215,123,110,0.45)', neutral: '#9aa3ab' };
+export const PALETTE = ['#f2a0ae', '#f2c08a', '#9fd39a', '#8fabf5', '#d873e6', '#e6d27a', '#7fd6cf', '#c79af5', '#ff8f6b', '#b8a6c0'];
+export const COLORS = { tag: '#e8c95a', attachment: '#e3b98a', unresolved: '#ff6f8e', linkEdge: 'rgba(214,160,220,0.55)', tagEdge: 'rgba(232,201,90,0.5)', attEdge: 'rgba(227,185,138,0.45)', unresEdge: 'rgba(255,111,142,0.45)', neutral: '#b8a6c0' };
 
 export type NodeKind = 'note' | 'tag' | 'attachment' | 'unresolved';
 export type EdgeKind = 'link' | 'tag' | 'tag-parent' | 'attachment' | 'unresolved';

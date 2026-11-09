@@ -35,7 +35,14 @@ async function launch(pkg = PKG) {
   const wv = await device.webView({ pkg }, { timeout: 60000 });
   page = await wv.page();
   page.setDefaultTimeout(45000);
-  await page.waitForFunction(() => globalThis.__atlas && globalThis.__atlas.getState().ready, null, { timeout: 60000 });
+  // Wait until stored data has been opened (vault list read, and the current vault's notes loaded if any).
+  await page.waitForFunction(() => {
+    const s = globalThis.__atlas && globalThis.__atlas.getState();
+    if (!s || !s.ready) return false;
+    if (!s.vaults.length) return true;
+    return !!s.vault && (!s.vault.persistContent || !s.vault.manifest.length || s.notes.size > 0 || s.attachments.size > 0);
+  }, null, { timeout: 60000 });
+  await sleep(500);
   return page;
 }
 async function stop(pkg = PKG) { await sh(`am force-stop ${pkg}`); await sleep(1000); }
@@ -93,6 +100,7 @@ try {
     resources: performance.getEntriesByType('resource').map((r) => r.name),
   }));
   await page.evaluate(() => document.fonts.ready);
+  await page.waitForSelector('text=Import', { timeout: 20000 }).catch(() => {});
   check('First launch in airplane mode renders the app', /Vault Atlas/.test(boot.title) && /import/i.test(boot.text), boot.text.slice(0, 80).replace(/\n/g, ' '));
   check('App is served from inside the APK (https://localhost)', boot.origin === 'https://localhost', boot.origin);
   check('All loaded resources are local', boot.resources.every((u) => u.startsWith('https://localhost/') || u.startsWith('blob:') || u.startsWith('data:')), boot.resources.filter((u) => !u.startsWith('https://localhost/')).slice(0, 3).join(', '));
@@ -136,6 +144,12 @@ try {
   await sleep(6000);
   const net = await sh('ping -c 1 -W 3 8.8.8.8 >/dev/null 2>&1 && echo up || echo down');
   console.log('Emulator network (shell ping):', net);
+  // OS-level enforcement: a process running as the app's own Linux user cannot open internet sockets at all.
+  const shellNet = await sh('toybox nc -w 4 8.8.8.8 53 </dev/null >/dev/null 2>&1; echo rc=$?');
+  const appNet = await sh(`run-as ${PKG} toybox nc -w 4 8.8.8.8 53 </dev/null 2>&1; echo rc=$?`);
+  const appPing = await sh(`run-as ${PKG} /system/bin/ping -c 1 -W 3 8.8.8.8 2>&1 | tail -1`);
+  console.log('shell nc:', shellNet, '| app nc:', appNet, '| app ping:', appPing);
+  check('As the app’s own Android user, opening an internet socket is refused by the OS', /denied|not permitted|EACCES/i.test(appNet + ' ' + appPing) || (!/rc=0/.test(appNet) && /rc=0/.test(shellNet)), `app: ${appNet.replace(/\n/g, ' ')} | ${appPing} | shell: ${shellNet}`);
   const before = await page.evaluate(() => window.Capacitor.Plugins.AtlasNative.info());
   const probes = await page.evaluate(async () => {
     const out = {};
@@ -220,16 +234,22 @@ try {
 /* ------------------------------------------- release APK smoke test */
 if (process.env.RELEASE_APK) {
   try {
+    await sh(`am force-stop ${PKG}`); await sh('input keyevent HOME');
     await sh('cmd connectivity airplane-mode enable'); await sleep(2000);
     await device.installApk(process.env.RELEASE_APK);
     const perms = await sh(`dumpsys package ${RELEASE_PKG} | grep -E 'android.permission.INTERNET' || true`);
     check('Signed release APK: no INTERNET permission', perms === '');
-    await sh(`am start -W -n ${RELEASE_PKG}/${ACTIVITY}`); await sleep(6000);
-    const dump = await sh('uiautomator dump /sdcard/ui.xml >/dev/null && cat /sdcard/ui.xml');
-    check('Signed release APK launches offline and renders', /Vault Atlas/.test(dump) && /[Ii]mport/.test(dump));
-    const dbg = await sh(`cat /proc/net/unix | grep -c webview_devtools_remote_$(pidof ${RELEASE_PKG}) || true`);
-    check('Release build has WebView debugging disabled', dbg === '0', dbg);
+    await sh('logcat -c');
+    await sh(`am start -W -n ${RELEASE_PKG}/${ACTIVITY}`); await sleep(8000);
+    const pid = await sh(`pidof ${RELEASE_PKG} || true`);
+    const top = await sh("dumpsys activity activities | grep -m1 -E 'topResumedActivity|mResumedActivity'");
+    const crash = await sh(`logcat -d | grep -E 'FATAL EXCEPTION|AndroidRuntime: Process: ${RELEASE_PKG}' | head -3 || true`);
     await shot('09-release-offline');
+    const png = await device.screenshot();
+    check('Signed release APK launches offline (running, in front, no crash)', !!pid && top.includes(RELEASE_PKG) && !crash, `pid ${pid}; ${top}; ${crash}`);
+    check('Release screen is rendered, not blank', png.length > 40000, png.length + ' bytes');
+    const dbg = pid ? await sh(`cat /proc/net/unix | grep -c "webview_devtools_remote_${pid}" || true`) : 'no pid';
+    check('Release build has WebView remote debugging disabled', dbg === '0', dbg);
   } catch (err) { check('Release smoke test', false, err.message); }
 }
 

@@ -82,6 +82,7 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: npm }
       - run: npm ci
+      - run: npx playwright install android
       - uses: actions/download-artifact@v4
         with: { name: apks, path: apk }
       - name: Enable KVM for the emulator

@@ -60,10 +60,14 @@ jobs:
           echo "$ATLAS_KEYSTORE_BASE64" | base64 -d > "$ATLAS_KEYSTORE_FILE"
           ./gradlew --no-daemon -q assembleRelease
           rm -f "$ATLAS_KEYSTORE_FILE"
-          BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
-          "$BT/apksigner" verify --print-certs app/build/outputs/apk/release/app-release.apk | grep -E "Signer #1 certificate (DN|SHA-256)"
-          "$BT/aapt2" dump permissions app/build/outputs/apk/release/app-release.apk
-          if "$BT/aapt2" dump permissions app/build/outputs/apk/release/app-release.apk | grep -q "android.permission.INTERNET"; then echo "INTERNET permission found!"; exit 1; fi
+          ls -la app/build/outputs/apk/release/
+          APKSIGNER=$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort -V | tail -1)
+          AAPT2=$(find "$ANDROID_HOME/build-tools" -name aapt2 -type f | sort -V | tail -1)
+          echo "Using $APKSIGNER and $AAPT2"
+          "$APKSIGNER" verify --print-certs app/build/outputs/apk/release/app-release.apk | grep -E "certificate (DN|SHA-256)" || { echo "APK is not signed"; exit 1; }
+          PERMS=$("$AAPT2" dump permissions app/build/outputs/apk/release/app-release.apk)
+          echo "$PERMS"
+          if echo "$PERMS" | grep -q "android.permission.INTERNET"; then echo "INTERNET permission found!"; exit 1; fi
           cp app/build/outputs/apk/release/app-release.apk ../apk/vault-atlas.apk
         shell: bash
       - uses: actions/upload-artifact@v4

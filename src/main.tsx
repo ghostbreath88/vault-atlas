@@ -5,9 +5,10 @@ import App from './App';
 import { boot, toast, setState } from './store';
 import { registerSW } from 'virtual:pwa-register';
 import { isNative, installNativeLinkHandler } from './native';
+import { loadFolderStatus } from './folder';
 
 createRoot(document.getElementById('root')!).render(<StrictMode><App /></StrictMode>);
-boot();
+boot().then(() => loadFolderStatus());
 installNativeLinkHandler((m, t) => toast(m, t));
 
 // The Android app ships every file inside the APK, so it needs no service worker.

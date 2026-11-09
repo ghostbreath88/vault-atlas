@@ -29,6 +29,8 @@ export interface State {
   persistence: 'granted' | 'denied' | 'unsupported' | 'unknown';
   dbError?: string;
   updateReady?: () => void;
+  /** Android app: the connected vault folder (read-only). */
+  folder?: import('./native').FolderStatus;
 }
 
 let state: State = {

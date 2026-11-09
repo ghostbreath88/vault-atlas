@@ -5,7 +5,7 @@ import type { DateSource, InventoryItem, ParsedNote } from './types';
 
 export type ImportSource =
   | { kind: 'zip'; file: Blob; label: string }
-  | { kind: 'files'; files: { file: File; relPath: string }[]; label: string };
+  | { kind: 'files'; files: { file: File; relPath: string; size?: number; mtime?: number }[]; label: string; fromFolder?: boolean };
 
 export interface ScannedNote { rawPath: string; content: string; hash: string; size: number; mtime?: number; mtimeKind?: DateSource; parsed: ParsedNote; decodeWarning?: string }
 export interface ScannedAttachment { rawPath: string; blob: Blob; media: MediaType; mime: string; hash: string; size: number; mtime?: number }
@@ -39,10 +39,10 @@ async function listEntries(src: ImportSource): Promise<Entry[]> {
       .filter((e) => !e.dir)
       .map((e) => ({ path: normalizePath(e.name), size: e.size, mtime: e.mtime, mtimeKind: 'zip' as const, read: () => extractEntry(src.file, e) }));
   }
-  return src.files.map(({ file, relPath }) => ({
+  return src.files.map(({ file, relPath, size, mtime }) => ({
     path: normalizePath(relPath || file.name),
-    size: file.size,
-    mtime: file.lastModified || undefined,
+    size: size ?? file.size,
+    mtime: mtime || file.lastModified || undefined,
     mtimeKind: 'file' as const,
     read: async () => new Uint8Array(await file.arrayBuffer()),
   }));

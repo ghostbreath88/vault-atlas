@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { FileArchive, FolderOpen, Files, RefreshCw, FilePlus2, Library, Sparkles, X, CheckCircle2, AlertTriangle, Info, ShieldCheck, Trash2, ArrowRight } from 'lucide-react';
+import { FileArchive, FolderOpen, Files, RefreshCw, FilePlus2, Library, Sparkles, X, CheckCircle2, AlertTriangle, Info, ShieldCheck, Trash2, ArrowRight, FolderSync, Unplug, Smartphone } from 'lucide-react';
+import { getState, saveSettings, setObsidianVaultName, openVault } from '../store';
+import { isNative } from '../native';
+import { disconnectFolder, folderProblem, folderSource, loadFolderStatus, pickFolder } from '../folder';
 import { useStore, startScan, buildPlan, applyPlan, suggestStripRoot, hasStructure, toast, cleanupMissing, type ImportPlan, type Progress, type ScanJob } from '../store';
 import type { ImportSource } from '../lib/importCore';
 import type { ImportLog, ImportMode } from '../lib/types';
@@ -10,7 +13,7 @@ import demoZipUrl from '../../fixtures/vault-v1.zip?url';
 const supportsFolder = typeof document !== 'undefined' && 'webkitdirectory' in document.createElement('input');
 const MODE_TITLE: Record<ImportMode, string> = { 'new-vault': 'Import a separate vault', 'replace-snapshot': 'Refresh entire vault (replace snapshot)', 'add-update': 'Add or update files' };
 
-type Step = { s: 'idle' } | { s: 'scanning'; mode: ImportMode; label: string; progress?: Progress; job?: ScanJob } | { s: 'review'; plan: ImportPlan; isDemo?: boolean } | { s: 'applying' } | { s: 'done'; log: ImportLog; isNew: boolean };
+type Step = { s: 'idle' } | { s: 'scanning'; mode: ImportMode; label: string; progress?: Progress; job?: { cancel: () => void } } | { s: 'review'; plan: ImportPlan; isDemo?: boolean; after?: (l: ImportLog) => Promise<void> } | { s: 'applying' } | { s: 'done'; log: ImportLog; isNew: boolean; returnTo?: string; auto?: boolean };
 
 function Picker({ mode, onSource, compact }: { mode: ImportMode; onSource: (src: ImportSource) => void; compact?: boolean }) {
   const zip = useRef<HTMLInputElement>(null), dir = useRef<HTMLInputElement>(null), files = useRef<HTMLInputElement>(null);
@@ -50,7 +53,7 @@ function FileList({ title, items, open }: { title: string; items: { path: string
   );
 }
 
-function Review({ plan: initial, isDemo, onApplied, onCancel, onSwitchMode }: { plan: ImportPlan; isDemo?: boolean; onApplied: (l: ImportLog, isNew: boolean) => void; onCancel: () => void; onSwitchMode: (m: ImportMode) => void }) {
+function Review({ plan: initial, isDemo, after, onApplied, onCancel, onSwitchMode }: { plan: ImportPlan; isDemo?: boolean; after?: (l: ImportLog) => Promise<void>; onApplied: (l: ImportLog, isNew: boolean) => void; onCancel: () => void; onSwitchMode: (m: ImportMode) => void }) {
   const { vault, settings, notes } = useStore((s) => s);
   const [strip, setStrip] = useState(initial.stripRoot);
   const [dest, setDest] = useState<Record<string, string>>({});
@@ -75,6 +78,7 @@ function Review({ plan: initial, isDemo, onApplied, onCancel, onSwitchMode }: { 
     try {
       const acceptedMoves: MoveCandidate[] = d.moves.filter((m) => moves[m.from]);
       const log = await applyPlan(plan, { persistContent: persist, missingAction, acceptedMoves, vaultName: name.trim() || undefined, isDemo });
+      if (after) await after(log);
       onApplied(log, plan.mode === 'new-vault');
     } catch (e) {
       toast('Import failed: ' + (e as Error).message, 'error');
@@ -184,7 +188,7 @@ function Review({ plan: initial, isDemo, onApplied, onCancel, onSwitchMode }: { 
 }
 
 export default function ImportPage({ query }: { query: URLSearchParams }) {
-  const { vault, vaults, imports, notes, persistence } = useStore((s) => s);
+  const { vault, vaults, imports, notes, persistence, folder, settings, app } = useStore((s) => s);
   const [step, setStep] = useState<Step>({ s: 'idle' });
   const [cleanup, setCleanup] = useState(false);
   const missing = [...notes.values()].filter((n) => n.missing);
@@ -209,7 +213,56 @@ export default function ImportPage({ query }: { query: URLSearchParams }) {
       begin('new-vault', { kind: 'zip', file: blob, label: 'Synthetic demo vault (bundled with the app)' }, true);
     } catch { toast('Could not load the bundled demo vault', 'error'); }
   };
+  /** Android: read the connected vault folder (read-only) and update Vault Atlas from it. */
+  const beginFolder = async (returnTo?: string) => {
+    const f = await loadFolderStatus();
+    if (!f?.connected) { toast('Connect your vault folder first', 'warn'); return; }
+    const problem = folderProblem(f);
+    if (problem) { toast(problem, 'error'); setStep({ s: 'idle' }); return; }
+    const st0 = getState();
+    if (st0.settings.folderVaultId && st0.vault?.id !== st0.settings.folderVaultId && st0.vaults.some((v) => v.id === st0.settings.folderVaultId)) await openVault(st0.settings.folderVaultId);
+    let cancelled = false;
+    let job: ScanJob | undefined;
+    const cancel = () => { cancelled = true; job?.cancel(); };
+    setStep({ s: 'scanning', mode: getState().vault ? 'replace-snapshot' : 'new-vault', label: `vault folder “${f.name ?? ''}”`, job: { cancel } });
+    try {
+      const src = await folderSource((done, total, current) => setStep((x) => (x.s === 'scanning' ? { ...x, progress: { done, total, current } } : x)), () => cancelled);
+      job = startScan(src, (p) => setStep((x) => (x.s === 'scanning' ? { ...x, progress: p } : x)));
+      const scan = await job.promise;
+      scan.failed.push(...src.unreadable);
+      scan.root = null; // folder paths are already vault-relative
+      const st = getState();
+      const linked = !!st.vault && st.settings.folderVaultId === st.vault.id;
+      const mode: ImportMode = st.vault ? 'replace-snapshot' : 'new-vault';
+      const plan = buildPlan(scan, mode, false);
+      const after = async (log: ImportLog) => {
+        await saveSettings({ folderVaultId: log.vaultId });
+        if (!getState().app?.obsidianVaultName) setObsidianVaultName(src.folderName);
+      };
+      const newlyMissing = plan.diff.missing.filter((m) => !(m.kind === 'note' ? st.notes.get(m.path)?.missing : st.attachments.get(m.path)?.missing));
+      if (linked && mode === 'replace-snapshot' && newlyMissing.length === 0 && plan.diff.moves.length === 0 && plan.duplicatesInSource.length === 0) {
+        setStep({ s: 'applying' });
+        const log = await applyPlan(plan, { persistContent: st.vault!.persistContent, missingAction: 'keep', acceptedMoves: [] });
+        await after(log);
+        setStep({ s: 'done', log, isNew: false, returnTo, auto: true });
+      } else {
+        setStep({ s: 'review', plan, after: async (log) => { await after(log); } });
+      }
+    } catch (e) {
+      const msg = (e as any)?.message || String(e);
+      if (/cancel/i.test(msg)) toast('Refresh cancelled. Nothing was changed.', 'warn');
+      else { toast(msg, 'error'); loadFolderStatus(); }
+      setStep({ s: 'idle' });
+    }
+  };
+  const connectFolder = async () => {
+    try {
+      const f = await pickFolder();
+      if (f) beginFolder();
+    } catch (e) { toast((e as Error).message || String(e), 'error'); }
+  };
   useEffect(() => { if (query.get('demo') === '1' && step.s === 'idle') { go('#/import'); startDemo(); } }, []);
+  useEffect(() => { if (query.get('folder') === 'refresh' && step.s === 'idle') { const r = query.get('return') ?? undefined; go('#/import'); beginFolder(r); } }, [query.get('folder')]);
   useEffect(() => {
     const reset = (e: Event) => { if ((e as CustomEvent).detail === '/import') setStep((st) => (st.s === 'done' || st.s === 'idle' ? { s: 'idle' } : st)); };
     addEventListener('atlas:nav', reset);
@@ -232,7 +285,7 @@ export default function ImportPage({ query }: { query: URLSearchParams }) {
     );
   }
   if (step.s === 'review') {
-    return <div className="page narrow"><Review plan={step.plan} isDemo={step.isDemo} onCancel={() => setStep({ s: 'idle' })} onApplied={(log, isNew) => setStep({ s: 'done', log, isNew })}
+    return <div className="page narrow"><Review plan={step.plan} isDemo={step.isDemo} after={step.after} onCancel={() => setStep({ s: 'idle' })} onApplied={(log, isNew) => setStep({ s: 'done', log, isNew })}
       onSwitchMode={(m) => setStep({ s: 'review', plan: buildPlan(step.plan.scan, m, suggestStripRoot(step.plan.scan, m)) })} /></div>;
   }
   if (step.s === 'done') {
@@ -240,8 +293,8 @@ export default function ImportPage({ query }: { query: URLSearchParams }) {
     return (
       <div className="page narrow">
         <div className="card stack" data-testid="import-done">
-          <div className="row"><CheckCircle2 color="var(--ok)" /><strong>Import complete</strong></div>
-          <div className="small muted">{step.isNew ? 'New vault imported.' : 'Snapshot updated.'} Search, backlinks, tags, dashboard counts and the graph have been rebuilt.</div>
+          <div className="row"><CheckCircle2 color="var(--ok)" /><strong>{step.auto ? 'Refreshed from folder' : 'Import complete'}</strong></div>
+          <div className="small muted">{step.isNew ? 'New vault imported.' : 'Snapshot updated.'} Search, backlinks, tags, dashboard counts and the graph have been rebuilt.{step.auto ? ' Nothing went missing, so no review was needed.' : ''}</div>
           <div className="stats">
             <Count id="done-added" n={c.added} label="New" /><Count id="done-changed" n={c.changed} label="Changed" /><Count id="done-unchanged" n={c.unchanged} label="Unchanged" />
             {step.log.mode === 'replace-snapshot' && <Count id="done-missing" n={c.missing - c.removed} label="Kept as missing" />}
@@ -249,7 +302,7 @@ export default function ImportPage({ query }: { query: URLSearchParams }) {
           </div>
           {step.log.failed.length > 0 && <FileList title="Failed files" open items={step.log.failed.map((f) => ({ path: f.path, note: f.error }))} />}
           {persistence === 'denied' && <div className="notice warn"><Info aria-hidden /><div>Your browser didn't grant persistent storage. It may clear Vault Atlas data if the device runs low on space. Keep your ZIP and export your settings occasionally.</div></div>}
-          <div className="row-wrap"><a className="btn primary" href="#/" data-testid="button-go-home">Open dashboard</a><button className="btn ghost" onClick={() => setStep({ s: 'idle' })}>Import something else</button></div>
+          <div className="row-wrap">{step.returnTo && step.returnTo !== '#/' && <a className="btn primary" href={step.returnTo} data-testid="button-return">Back to where you were</a>}<a className={'btn' + (step.returnTo && step.returnTo !== '#/' ? '' : ' primary')} href="#/" data-testid="button-go-home">Open dashboard</a><button className="btn ghost" onClick={() => setStep({ s: 'idle' })}>Import something else</button></div>
         </div>
       </div>
     );
@@ -260,6 +313,28 @@ export default function ImportPage({ query }: { query: URLSearchParams }) {
     <div className="page">
       <div className="page-head"><div><h1 className="page-title">Import &amp; update</h1>
         <p className="page-sub">Each import is a snapshot. Vault Atlas doesn't watch your Obsidian folder — import again whenever you want it up to date. Files are read inside this browser; nothing is uploaded and your originals are never modified.</p></div></div>
+      {isNative && (
+        <section className="card stack" style={{ marginBottom: 20 }} aria-labelledby="h-folder" data-testid="section-folder">
+          <div className="row"><Smartphone size={18} color="var(--accent)" /><h2 id="h-folder" style={{ margin: 0, fontSize: 'var(--text-lg)' }}>Vault folder on this device</h2></div>
+          {!folder?.connected ? <>
+            <div className="xs muted">Pick your Obsidian vault folder once with Android's folder picker. Vault Atlas gets <strong>read-only</strong> access, remembers it, and can reread it whenever you tap <strong>Refresh from folder</strong> — for example after editing a note in Obsidian. It never changes your files.</div>
+            <div><button className="btn primary" onClick={connectFolder} data-testid="button-connect-folder"><FolderOpen />Connect vault folder</button></div>
+          </> : <>
+            <div className="small">Connected: <strong className="mono" data-testid="text-folder-name">{folder.name ?? 'folder'}</strong> <span className="xs faint">(read-only)</span></div>
+            {folderProblem(folder) && <div className="notice danger" data-testid="folder-problem"><AlertTriangle aria-hidden /><div>{folderProblem(folder)}</div></div>}
+            <div className="row-wrap">
+              {!folderProblem(folder) && <button className="btn primary" onClick={() => beginFolder()} data-testid="button-refresh-folder-import"><FolderSync />{settings.folderVaultId && vault?.id === settings.folderVaultId ? 'Refresh from folder' : 'Read this folder'}</button>}
+              <button className="btn" onClick={connectFolder} data-testid="button-reconnect-folder"><FolderOpen />{folderProblem(folder) ? 'Reconnect folder' : 'Choose a different folder'}</button>
+              <button className="btn ghost" onClick={() => disconnectFolder().then(() => toast('Folder disconnected. Imported notes stay in Vault Atlas.'))} data-testid="button-disconnect-folder"><Unplug />Disconnect</button>
+            </div>
+            {vault && <label className="field" style={{ maxWidth: 420 }}>Obsidian vault name (used by “Open in Obsidian”)
+              <input className="input" key={vault.id + (app?.obsidianVaultName ?? '')} defaultValue={app?.obsidianVaultName ?? ''} placeholder={folder.name ?? vault.name} onBlur={(e) => setObsidianVaultName(e.target.value.trim())} data-testid="input-obsidian-vault" />
+              <span className="xs faint">Must match the vault name shown in Obsidian (usually the folder name).</span>
+            </label>}
+          </>}
+          <div className="xs faint">One connected folder at a time. ZIP import below still works as a fallback.</div>
+        </section>
+      )}
       {vault && (
         <section className="card stack" style={{ marginBottom: 20 }} aria-labelledby="h-update">
           <div className="row"><RefreshCw size={18} color="var(--accent)" /><h2 id="h-update" style={{ margin: 0, fontSize: 'var(--text-lg)' }}>Update “{vault.isDemo ? 'Demo vault' : vault.name}”</h2></div>

@@ -1,3 +1,4 @@
+import { RefreshFolderButton } from '../components/FolderButton';
 import { useMemo, useState } from 'react';
 import { Shuffle, Pin, Clock, RefreshCw, Folder, Hash, Upload, Settings2, ChevronUp, ChevronDown, Eye, EyeOff, Sparkles, AlertTriangle, Network } from 'lucide-react';
 import { useStore, setDashboard } from '../store';
@@ -121,6 +122,7 @@ export default function Home() {
           <p className="page-sub">{plural(s.notes, 'note')} · {plural(s.attachments, 'attachment')} · snapshot imported {fmtAgo(vault.lastImportAt)}{s.missing ? ` · ${s.missing} kept from an older snapshot` : ''}</p>
         </div>
         <div className="row-wrap">
+          <RefreshFolderButton />
           <a className="btn" href="#/import" data-testid="button-update"><Upload />Update vault</a>
           <button className={'btn icon ghost' + (customize ? ' on' : '')} aria-pressed={customize} aria-label="Customize dashboard" onClick={() => setCustomize(!customize)} data-testid="button-customize"><Settings2 /></button>
         </div>

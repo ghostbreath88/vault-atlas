@@ -1,3 +1,4 @@
+import { RefreshFolderButton } from '../components/FolderButton';
 import { isNative } from '../native';
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { Pin, PinOff, Code2, BookOpen, Network, LayoutDashboard, ImageOff, Image as ImageIcon, ExternalLink, AlertTriangle, Link2, CornerDownLeft, Hash, Paperclip, Info } from 'lucide-react';
@@ -106,6 +107,7 @@ export default function NotePage({ path, query }: { path: string; query: URLSear
             <button className={'btn sm' + (raw ? ' on' : '')} aria-pressed={raw} onClick={() => setRaw(!raw)} data-testid="button-raw">{raw ? <BookOpen /> : <Code2 />}{raw ? 'Reading view' : 'View original Markdown'}</button>
             <a className="btn sm" href={`#/graph?center=${encodeURIComponent(path)}`} data-testid="button-open-graph"><Network />Graph</a>
             <button className="btn sm" onClick={() => setAddOpen(true)} data-testid="button-add-board"><LayoutDashboard />Add to board</button>
+            <RefreshFolderButton small />
             <a className="btn sm ghost" href={obsidianUri} data-testid="button-open-obsidian" data-uri={obsidianUri} title={`Opens “${obsidianVault}” in the Obsidian app if it's installed (vault name can be changed in Settings)`}><ExternalLink />Open in Obsidian</a>
           </div>
           {blocked > 0 && !raw && (

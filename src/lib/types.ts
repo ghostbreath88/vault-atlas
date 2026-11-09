@@ -158,6 +158,8 @@ export interface Settings {
   maxAttachmentMB: number;
   graphNodeLimit: number;
   persistDefault: boolean;
+  /** Android app: the vault the connected folder belongs to (one connected folder at a time). */
+  folderVaultId?: string;
 }
 
 export const DEFAULT_SETTINGS: Settings = {

@@ -1,0 +1,8 @@
+io.github.ghostbreath88.obsidianstub-pngs-0 /home/user/workspace/vault-atlas/tests/android/obsidian-stub/build/generated/res/pngs/release
+io.github.ghostbreath88.obsidianstub-resValues-1 /home/user/workspace/vault-atlas/tests/android/obsidian-stub/build/generated/res/resValues/release
+io.github.ghostbreath88.obsidianstub-updated_navigation_xml-2 /home/user/workspace/vault-atlas/tests/android/obsidian-stub/build/generated/updated_navigation_xml/release
+io.github.ghostbreath88.obsidianstub-packageReleaseResources-3 /home/user/workspace/vault-atlas/tests/android/obsidian-stub/build/intermediates/incremental/release/packageReleaseResources/merged.dir
+io.github.ghostbreath88.obsidianstub-packageReleaseResources-4 /home/user/workspace/vault-atlas/tests/android/obsidian-stub/build/intermediates/incremental/release/packageReleaseResources/stripped.dir
+io.github.ghostbreath88.obsidianstub-release-5 /home/user/workspace/vault-atlas/tests/android/obsidian-stub/build/intermediates/merged_res/release/mergeReleaseResources
+io.github.ghostbreath88.obsidianstub-main-6 /home/user/workspace/vault-atlas/tests/android/obsidian-stub/src/main/res
+io.github.ghostbreath88.obsidianstub-release-7 /home/user/workspace/vault-atlas/tests/android/obsidian-stub/src/release/res

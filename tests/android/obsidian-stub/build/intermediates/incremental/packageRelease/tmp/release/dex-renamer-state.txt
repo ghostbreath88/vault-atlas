@@ -1,0 +1,4 @@
+#Mon Nov 09 21:05:52 UTC 2026
+base.0=/home/user/workspace/vault-atlas/tests/android/obsidian-stub/build/intermediates/dex/release/mergeDexRelease/classes.dex
+path.0=classes.dex
+renamed.0=classes.dex

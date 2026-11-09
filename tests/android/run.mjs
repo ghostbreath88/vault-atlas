@@ -28,20 +28,35 @@ if (!device) throw new Error('No Android device/emulator found');
 const sh = async (cmd) => (await device.shell(cmd)).toString().trim();
 await sh('settings put global hide_error_dialogs 1').catch(() => {});
 await sh('settings put secure anr_show_background 0').catch(() => {});
-/** Taps a system-UI element, first dismissing any "isn't responding" dialog the slow emulator may show. */
-async function tapSys(sel, timeout = 30000) {
+/** Finds a node in the current screen (system UI included) with Android's uiautomator and taps its centre. */
+async function findNode(re) {
+  const xml = await sh('uiautomator dump /sdcard/ui.xml >/dev/null 2>&1; cat /sdcard/ui.xml');
+  for (const m of xml.matchAll(/<node [^>]*?>/g)) {
+    const n = m[0];
+    const text = (n.match(/ text="([^"]*)"/) || [])[1] || '';
+    const desc = (n.match(/ content-desc="([^"]*)"/) || [])[1] || '';
+    const b = n.match(/bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"/);
+    if (b && (re.test(text) || re.test(desc))) return { x: (+b[1] + +b[3]) >> 1, y: (+b[2] + +b[4]) >> 1, text: text || desc };
+  }
+  return null;
+}
+async function tapSys(re, timeout = 30000) {
+  if (!(re instanceof RegExp)) re = new RegExp('^' + String(re.text ?? re).replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$');
   const end = Date.now() + timeout;
   for (;;) {
-    try {
-      const anr = await sh("dumpsys window | grep -c 'Application Not Responding' || true");
-      if (anr !== '0') await device.tap({ text: /^wait$/i }, { timeout: 3000 }).catch(() => {});
-      await device.tap(sel, { timeout: 5000 });
-      return;
-    } catch (e) { if (Date.now() > end) throw e; await sleep(1000); }
+    const anr = await findNode(/isn.t responding/);
+    if (anr) { const w = await findNode(/^wait$/i); if (w) await sh(`input tap ${w.x} ${w.y}`); await sleep(800); continue; }
+    const n = await findNode(re);
+    if (n) { await sh(`input tap ${n.x} ${n.y}`); return n; }
+    if (Date.now() > end) throw new Error('Not found on screen: ' + re);
+    await sleep(1000);
   }
 }
-console.log('Device:', await sh('getprop ro.product.model'), 'Android', await sh('getprop ro.build.version.release'), 'SDK', await sh('getprop ro.build.version.sdk'));
-console.log('WebView:', await sh("dumpsys webviewupdate | grep -m1 'Current WebView package'"));
+async function waitSys(re, timeout = 30000) {
+  const end = Date.now() + timeout;
+  while (Date.now() < end) { if (await findNode(re)) return true; await sleep(1000); }
+  return false;
+}
 
 let page;
 async function launch(pkg = PKG) {
@@ -199,9 +214,9 @@ try {
   await sh('rm -f /sdcard/Download/vault-atlas-settings-*.json');
   await go('#/settings');
   await page.click('[data-testid="button-export"]');
-  await device.wait({ text: /^save$/i }, { timeout: 20000 }).catch(() => {});
+  await waitSys(/^save$/i, 20000);
   await shot('06-save-dialog');
-  await tapSys({ text: /^save$/i });
+  await tapSys(/^save$/i);
   await sleep(2500);
   let exported = await sh("ls /sdcard/Download/ 2>/dev/null | grep vault-atlas-settings || find /sdcard -name 'vault-atlas-settings-*.json' 2>/dev/null | head -1");
   const expPath = exported.includes('/') ? exported.split('\n')[0] : '/sdcard/Download/' + exported.split('\n')[0];
@@ -239,7 +254,7 @@ try {
   check('Desktop-size window (1920×1080 @160dpi) shows the side navigation', desk.sidebar !== 'none' && !desk.overflow, JSON.stringify(desk));
   await sh('wm size reset'); await sh('wm density reset'); await sleep(2000);
 
-  if (CP2) await (await import('./folder.mjs')).run({ device, tapSys, sh, sleep, check, launch, stop, st, go, shot, getPage: () => page, VAULT_DIR, PKG, ROOT });
+  if (CP2) await (await import('./folder.mjs')).run({ device, tapSys, waitSys, sh, sleep, check, launch, stop, st, go, shot, getPage: () => page, VAULT_DIR, PKG, ROOT });
 } catch (err) {
   check('Test run completed without crashing', false, err.stack || err);
   await shot('zz-crash');

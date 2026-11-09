@@ -1,9 +1,20 @@
+import { isNative } from '../native';
 export default function Help() {
   return (
     <div className="page narrow">
       <div className="page-head"><div><h1 className="page-title">Help &amp; limits</h1><p className="page-sub">How Vault Atlas works, what it keeps private, and what it doesn't do (yet).</p></div></div>
       <div className="md" style={{ fontSize: '1rem' }}>
-        <h2>Everyday use on Android / Samsung DeX</h2>
+        {isNative && <>
+          <h2>Android app: folder workflow</h2>
+          <ol>
+            <li>Open <strong>Import &amp; update → Connect vault folder</strong> and pick your Obsidian vault folder in Android's folder picker, then tap <strong>Use this folder</strong> and <strong>Allow</strong>. Access is read-only and is remembered.</li>
+            <li>Read a note. Tap <strong>Open in Obsidian</strong> to open exactly that file in Obsidian (the vault name used for this is under Import &amp; update; it must match the vault name in Obsidian).</li>
+            <li>Edit and save in Obsidian, switch back to Vault Atlas, and tap <strong>Refresh from folder</strong>. Changed and new files are reread and search, links, tags and the graph are rebuilt. If notes disappeared, you review that first — nothing is removed silently.</li>
+            <li>If Android removes the permission or the folder moves, Vault Atlas says so and offers <strong>Reconnect folder</strong>. ZIP import still works as a fallback.</li>
+          </ol>
+          <p>The Android app has <strong>no internet permission</strong>: Android itself refuses it any network connection, and the app additionally blocks every non-local request inside its web view. It is excluded from Google cloud backup.</p>
+        </>}
+        <h2>{isNative ? 'ZIP import (fallback)' : 'Everyday use on Android / Samsung DeX'}</h2>
         <ol>
           <li>In <strong>My Files</strong>, open your Obsidian vault folder (often <em>Internal storage › Documents › Obsidian</em> or wherever you created it). Long-press the vault folder, tap <strong>More</strong> (⋮) → <strong>Compress</strong>, and keep the ZIP format. The original folder is left untouched.</li>
           <li>In Vault Atlas, open <strong>Import &amp; update</strong>. First time: <strong>Choose vault ZIP</strong>. Later: <strong>Refresh entire vault</strong> with your newest ZIP.</li>
@@ -14,9 +25,10 @@ export default function Help() {
 
         <h2>Privacy</h2>
         <ul>
-          <li>Your vault is read and indexed <strong>inside this browser</strong> using background workers. Note text, file names, tags, attachments and graph data are never sent to a server, analytics service or AI model. There is no account and no API key.</li>
+          <li>Your vault is read and indexed <strong>{isNative ? 'inside this app' : 'inside this browser'}</strong> using background workers. Note text, file names, tags, attachments and graph data are never sent to a server, analytics service or AI model. There is no account and no API key.</li>
+          {isNative ? <li>The Android app makes no network traffic at all; images hosted on websites are never loaded.</li> : <>
           <li>The only network traffic is loading the app itself (from GitHub Pages) — after that it can run fully offline.</li>
-          <li>Remote images in notes are <strong>blocked</strong> by default; you can load them per note. Loading one contacts that image's server.</li>
+          <li>Remote images in notes are <strong>blocked</strong> by default; you can load them per note. Loading one contacts that image's server.</li></>}
           <li>Embedded HTML is sanitised: scripts, iframes, forms, styles and event handlers are removed. Dataview, Templater and other plugin code blocks are shown as code and never run.</li>
           <li>Vault Atlas is <strong>read-only</strong>. It never writes, renames or deletes your Obsidian files.</li>
         </ul>

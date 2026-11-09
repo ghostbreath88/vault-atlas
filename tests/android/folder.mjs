@@ -3,7 +3,7 @@
 import { readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
 
-export async function run({ device, tapSys, sh, sleep, check, launch, stop, st, go, shot, getPage, VAULT_DIR, PKG, ROOT }) {
+export async function run({ device, tapSys, waitSys, sh, sleep, check, launch, stop, st, go, shot, getPage, VAULT_DIR, PKG, ROOT }) {
   const page = () => getPage();
   const q = (p) => `"${p.replace(/"/g, '\\"')}"`;
   const md5All = async () => (await sh(`cd ${q(VAULT_DIR)} && find . -type f -exec md5sum {} + | sort -k2`));
@@ -23,14 +23,14 @@ export async function run({ device, tapSys, sh, sleep, check, launch, stop, st, 
   /* ------------------------------------------ connect with the system picker */
   await go('#/'); await go('#/import');
   await page().click('[data-testid="button-connect-folder"]');
-  await device.wait({ text: 'Atlas Demo Vault' }, { timeout: 30000 });
+  await waitSys(/^Atlas Demo Vault$/, 30000);
   await shot('10-folder-picker');
-  await tapSys({ text: 'Atlas Demo Vault' });
-  await sleep(1500);
-  await tapSys({ text: /use this folder/i });
-  await device.wait({ text: /^allow$/i }, { timeout: 15000 });
+  await tapSys(/^Atlas Demo Vault$/);
+  await sleep(2000);
+  await tapSys(/use this folder/i);
+  await waitSys(/^allow$/i, 15000);
   await shot('11-folder-permission');
-  await tapSys({ text: /^allow$/i });
+  await tapSys(/^allow$/i);
   const t0 = Date.now();
   await page().waitForSelector('[data-testid="import-review"], [data-testid="import-done"]', { timeout: 120000 });
   const tScan = Date.now() - t0;

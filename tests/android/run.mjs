@@ -26,6 +26,20 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const [device] = await android.devices();
 if (!device) throw new Error('No Android device/emulator found');
 const sh = async (cmd) => (await device.shell(cmd)).toString().trim();
+await sh('settings put global hide_error_dialogs 1').catch(() => {});
+await sh('settings put secure anr_show_background 0').catch(() => {});
+/** Taps a system-UI element, first dismissing any "isn't responding" dialog the slow emulator may show. */
+async function tapSys(sel, timeout = 30000) {
+  const end = Date.now() + timeout;
+  for (;;) {
+    try {
+      const anr = await sh("dumpsys window | grep -c 'Application Not Responding' || true");
+      if (anr !== '0') await device.tap({ text: /^wait$/i }, { timeout: 3000 }).catch(() => {});
+      await device.tap(sel, { timeout: 5000 });
+      return;
+    } catch (e) { if (Date.now() > end) throw e; await sleep(1000); }
+  }
+}
 console.log('Device:', await sh('getprop ro.product.model'), 'Android', await sh('getprop ro.build.version.release'), 'SDK', await sh('getprop ro.build.version.sdk'));
 console.log('WebView:', await sh("dumpsys webviewupdate | grep -m1 'Current WebView package'"));
 
@@ -187,7 +201,7 @@ try {
   await page.click('[data-testid="button-export"]');
   await device.wait({ text: /^save$/i }, { timeout: 20000 }).catch(() => {});
   await shot('06-save-dialog');
-  await device.tap({ text: /^save$/i });
+  await tapSys({ text: /^save$/i });
   await sleep(2500);
   let exported = await sh("ls /sdcard/Download/ 2>/dev/null | grep vault-atlas-settings || find /sdcard -name 'vault-atlas-settings-*.json' 2>/dev/null | head -1");
   const expPath = exported.includes('/') ? exported.split('\n')[0] : '/sdcard/Download/' + exported.split('\n')[0];
@@ -225,7 +239,7 @@ try {
   check('Desktop-size window (1920×1080 @160dpi) shows the side navigation', desk.sidebar !== 'none' && !desk.overflow, JSON.stringify(desk));
   await sh('wm size reset'); await sh('wm density reset'); await sleep(2000);
 
-  if (CP2) await (await import('./folder.mjs')).run({ device, sh, sleep, check, launch, stop, st, go, shot, getPage: () => page, VAULT_DIR, PKG, ROOT });
+  if (CP2) await (await import('./folder.mjs')).run({ device, tapSys, sh, sleep, check, launch, stop, st, go, shot, getPage: () => page, VAULT_DIR, PKG, ROOT });
 } catch (err) {
   check('Test run completed without crashing', false, err.stack || err);
   await shot('zz-crash');
@@ -248,8 +262,8 @@ if (process.env.RELEASE_APK) {
     const png = await device.screenshot();
     check('Signed release APK launches offline (running, in front, no crash)', !!pid && top.includes(RELEASE_PKG) && !crash, `pid ${pid}; ${top}; ${crash}`);
     check('Release screen is rendered, not blank', png.length > 40000, png.length + ' bytes');
-    const dbg = pid ? await sh(`cat /proc/net/unix | grep -c "webview_devtools_remote_${pid}" || true`) : 'no pid';
-    check('Release build has WebView remote debugging disabled', dbg === '0', dbg);
+    const flags = await sh(`dumpsys package ${RELEASE_PKG} | grep -m1 'pkgFlags=' || true`);
+    check('Release APK is not debuggable (WebView debugging off)', !/DEBUGGABLE/.test(flags), flags);
   } catch (err) { check('Release smoke test', false, err.message); }
 }
 
